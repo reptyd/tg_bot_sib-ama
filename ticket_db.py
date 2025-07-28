@@ -59,3 +59,11 @@ def get_tickets_by_category(category_key: str):
         t for t in tickets
         if t["category"] == category_key
     ]
+
+# 👇 ДОБАВЛЕНО: получение последнего открытого тикета по user_id
+def get_ticket_by_id_by_user_id(user_id: int):
+    tickets = load_tickets()
+    for t in reversed(tickets):  # Берём последний тикет этого пользователя
+        if t["user_id"] == user_id and t["status"] == "open":
+            return t
+    return None
