@@ -22,17 +22,25 @@ CATEGORY_MAP = {
     "quality": "Качество сервиса"
 }
 
+# Кнопки управления тикетом
+def ticket_action_buttons(user_id: int, ticket_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="Ответить", callback_data=f"reply_{user_id}")],
+        [InlineKeyboardButton(text="Закрыть", callback_data=f"close_{user_id}")],
+        [InlineKeyboardButton(text="Удалить", callback_data=f"delete_{user_id}")]
+    ])
+
 @router.callback_query(F.data.startswith("reply_"))
 async def reply_ticket(call: CallbackQuery, state: FSMContext):
-    ticket_id = int(call.data.split("_")[1])
-    ticket = get_ticket_by_id(ticket_id)
+    user_id = int(call.data.split("_")[1])
+    ticket = get_ticket_by_id_by_user_id(user_id)
     if not ticket:
         await call.answer("Тикет не найден.")
         return
 
     await state.set_state(Operator.replying_to)
     await state.update_data(ticket=ticket)
-    await call.message.answer(f"Напишите ответ пользователю @{ticket['username']}")
+    await call.message.answer(f"✍️ Напишите ответ пользователю @{ticket['username'] or 'Без username']}")
     await call.answer()
 
 @router.message(Operator.replying_to)
@@ -44,29 +52,21 @@ async def send_operator_reply(message: Message, state: FSMContext):
             ticket["user_id"],
             f"<b>Оператор Дуся:</b>\n{message.text}"
         )
-        await message.answer("Ответ отправлен пользователю.")
+        await message.answer("✅ Ответ отправлен пользователю.")
     await state.clear()
 
 @router.callback_query(F.data.startswith("close_"))
 async def close_ticket(call: CallbackQuery):
-    ticket_id = int(call.data.split("_")[1])
-    ticket = get_ticket_by_id(ticket_id)
-    if not ticket:
-        await call.answer("Тикет не найден.")
-        return
-    close_ticket_by_user_id(ticket["user_id"])
-    await call.message.edit_text("Обращение закрыто.")
+    user_id = int(call.data.split("_")[1])
+    close_ticket_by_user_id(user_id)
+    await call.message.edit_text("🟢 Обращение закрыто.")
     await call.answer("Закрыто.")
 
 @router.callback_query(F.data.startswith("delete_"))
 async def delete_ticket(call: CallbackQuery):
-    ticket_id = int(call.data.split("_")[1])
-    ticket = get_ticket_by_id(ticket_id)
-    if not ticket:
-        await call.answer("Тикет не найден.")
-        return
-    delete_ticket_by_user_id(ticket["user_id"])
-    await call.message.edit_text("Обращение удалено.")
+    user_id = int(call.data.split("_")[1])
+    delete_ticket_by_user_id(user_id)
+    await call.message.edit_text("🗑️ Обращение удалено.")
     await call.answer("Удалено.")
 
 @router.message(F.text.startswith("/view "))
@@ -77,26 +77,29 @@ async def view_ticket(message: Message):
     try:
         ticket_id = int(message.text.split()[1])
     except (IndexError, ValueError):
-        await message.answer("Неверный формат. Используйте /view <id>")
+        await message.answer("❌ Неверный формат. Используйте /view <id>")
         return
 
     ticket = get_ticket_by_id(ticket_id)
     if not ticket:
-        await message.answer("Тикет с таким ID не найден.")
+        await message.answer("❌ Тикет с таким ID не найден.")
         return
 
-    text = (
+    caption = (
         f"<b>Тикет #{ticket['id']}</b>\n"
         f"Категория: {CATEGORY_MAP.get(ticket['category'], ticket['category'])}\n"
-        f"Пользователь: @{ticket['username']}\n"
+        f"Пользователь: @{ticket['username'] or 'Без username'}\n"
         f"Статус: {ticket['status']}\n"
         f"Создан: {ticket['created_at']}\n\n"
         f"{ticket['text']}"
     )
+
+    markup = ticket_action_buttons(ticket["user_id"], ticket["id"])
+
     if ticket["photo"]:
-        await message.bot.send_photo(message.chat.id, photo=ticket["photo"], caption=text)
+        await message.bot.send_photo(message.chat.id, ticket["photo"], caption=caption, reply_markup=markup)
     else:
-        await message.answer(text)
+        await message.answer(caption, reply_markup=markup)
 
 @router.message(F.text == "/list")
 async def list_tickets(message: Message):
@@ -113,8 +116,6 @@ async def list_tickets(message: Message):
         for t in tickets
     ])
     await message.answer(f"<b>Открытые обращения:</b>\n\n{text}")
-
-# 👇👇👇 АРХИВ ПО КАТЕГОРИЯМ
 
 @router.message(F.text == "/архив")
 async def archive_menu(message: Message):
