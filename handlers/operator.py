@@ -40,7 +40,7 @@ async def reply_ticket(call: CallbackQuery, state: FSMContext):
 
     await state.set_state(Operator.replying_to)
     await state.update_data(ticket=ticket)
-    await call.message.answer(f"✍️ Напишите ответ пользователю @{ticket['username'] or 'Без username']}")
+    await call.message.answer(f"✍️ Напишите ответ пользователю @{ticket['username'] or 'Без username'}")
     await call.answer()
 
 @router.message(Operator.replying_to)
