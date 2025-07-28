@@ -16,6 +16,7 @@ class Ticket(StatesGroup):
 
 @router.message(F.text.lower() == "/start")
 async def start(message: Message, state: FSMContext):
+    await state.clear()
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="Общие вопросы", callback_data="cat_common")],
         [InlineKeyboardButton(text="Вопрос по оплате", callback_data="cat_payment")],
@@ -23,11 +24,23 @@ async def start(message: Message, state: FSMContext):
     ])
     await message.answer("Выберите категорию вашего вопроса:", reply_markup=kb)
 
+@router.message(F.text.lower() == "/help")
+async def help_command(message: Message, state: FSMContext):
+    await state.clear()
+    await message.answer(
+        "🤖 Я бот поддержки!\n\n"
+        "Вы можете:\n"
+        "• Использовать /start — начать обращение\n"
+        "• Выбрать категорию, описать проблему, прикрепить фото\n"
+        "• Дождаться ответа от оператора.\n\n"
+        "Оператор может вам ответить, закрыть или удалить тикет."
+    )
+
 @router.callback_query(F.data.startswith("cat_"))
 async def set_category(call: CallbackQuery, state: FSMContext):
     category = call.data.replace("cat_", "")
     await state.update_data(category=category)
-    await call.message.answer("Напишите, пожалуйста, ваш вопрос. Вы также можете прикрепить фото.")
+    await call.message.answer("✍️ Напишите, пожалуйста, ваш вопрос. Вы также можете прикрепить фото.")
     await state.set_state(Ticket.question)
     await call.answer()
 
@@ -66,5 +79,5 @@ async def get_question(message: Message, state: FSMContext):
         else:
             await message.bot.send_message(admin_id, caption, reply_markup=reply_markup)
 
-    await message.answer("Ваше обращение отправлено оператору. Ожидайте ответа.")
+    await message.answer("✅ Ваше обращение отправлено оператору. Ожидайте ответа.")
     await state.clear()

@@ -2,20 +2,26 @@ from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from config import OPERATOR_IDS
 from ticket_db import (
     get_open_tickets,
     get_ticket_by_id,
     close_ticket_by_user_id,
-    delete_ticket_by_user_id
+    delete_ticket_by_user_id,
+    get_tickets_by_category
 )
+from config import OPERATOR_IDS
 
 router = Router()
 
 class Operator(StatesGroup):
     replying_to = State()
 
-# 👇 Используется ID тикета, а не user_id
+CATEGORY_MAP = {
+    "common": "Общие вопросы",
+    "payment": "Вопрос по оплате",
+    "quality": "Качество сервиса"
+}
+
 @router.callback_query(F.data.startswith("reply_"))
 async def reply_ticket(call: CallbackQuery, state: FSMContext):
     ticket_id = int(call.data.split("_")[1])
@@ -81,7 +87,7 @@ async def view_ticket(message: Message):
 
     text = (
         f"<b>Тикет #{ticket['id']}</b>\n"
-        f"Категория: {ticket['category']}\n"
+        f"Категория: {CATEGORY_MAP.get(ticket['category'], ticket['category'])}\n"
         f"Пользователь: @{ticket['username']}\n"
         f"Статус: {ticket['status']}\n"
         f"Создан: {ticket['created_at']}\n\n"
@@ -103,7 +109,37 @@ async def list_tickets(message: Message):
         return
 
     text = "\n\n".join([
-        f"#{t['id']} | @{t['username']} | {t['category']}\n{t['text'][:100]}..."
+        f"#{t['id']} | @{t['username']} | {CATEGORY_MAP.get(t['category'], t['category'])}\n{t['text'][:100]}..."
         for t in tickets
     ])
     await message.answer(f"<b>Открытые обращения:</b>\n\n{text}")
+
+# 👇👇👇 АРХИВ ПО КАТЕГОРИЯМ
+
+@router.message(F.text == "/архив")
+async def archive_menu(message: Message):
+    if message.chat.id not in OPERATOR_IDS:
+        return
+
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="Общие вопросы", callback_data="archive_common")],
+        [InlineKeyboardButton(text="Вопрос по оплате", callback_data="archive_payment")],
+        [InlineKeyboardButton(text="Качество сервиса", callback_data="archive_quality")],
+    ])
+    await message.answer("📁 Архив обращений:\nВыберите категорию:", reply_markup=kb)
+
+@router.callback_query(F.data.startswith("archive_"))
+async def show_category_archive(call: CallbackQuery):
+    category_key = call.data.replace("archive_", "")
+    tickets = get_tickets_by_category(category_key)
+    if not tickets:
+        await call.message.answer("Обращений по этой категории пока нет.")
+        await call.answer()
+        return
+
+    text = f"📂 <b>{CATEGORY_MAP.get(category_key, category_key)}</b>\n\n"
+    for t in tickets:
+        text += f"#{t['id']} | @{t['username']} | {t['text'][:60]}...\n/view {t['id']}\n\n"
+
+    await call.message.answer(text)
+    await call.answer()

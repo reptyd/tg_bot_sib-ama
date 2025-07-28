@@ -1,12 +1,21 @@
-
 import asyncio
 from aiogram import Bot, Dispatcher
+from config import TOKEN
 from handlers import user, operator
-from config import BOT_TOKEN
-bot = Bot(token=BOT_TOKEN, parse_mode="HTML")
+from aiogram.client.default import DefaultBotProperties
+from aiogram.types import BotCommand
+
+bot = Bot(token=TOKEN, default=DefaultBotProperties(parse_mode="HTML"))
 dp = Dispatcher()
 
+async def set_bot_commands():
+    await bot.set_my_commands([
+        BotCommand(command="start", description="Начать обращение"),
+        BotCommand(command="help", description="Как пользоваться ботом")
+    ])
+
 async def main():
+    await set_bot_commands()
     dp.include_router(user.router)
     dp.include_router(operator.router)
     await dp.start_polling(bot)

@@ -1,4 +1,3 @@
-
 import json
 from datetime import datetime
 from pathlib import Path
@@ -30,16 +29,19 @@ def create_ticket(user_id, username, category, text, photo=None):
     tickets.append(ticket)
     save_tickets(tickets)
     return ticket
+
 def delete_ticket_by_user_id(user_id):
     tickets = load_tickets()
     tickets = [t for t in tickets if not (t["user_id"] == user_id and t["status"] == "open")]
     save_tickets(tickets)
+
 def get_ticket_by_id(ticket_id: int):
     tickets = load_tickets()
     for t in tickets:
         if t["id"] == ticket_id:
             return t
     return None
+
 def close_ticket_by_user_id(user_id):
     tickets = load_tickets()
     for t in tickets:
@@ -49,3 +51,11 @@ def close_ticket_by_user_id(user_id):
 
 def get_open_tickets():
     return [t for t in load_tickets() if t["status"] == "open"]
+
+# 👇 ДОБАВЛЕНО: архив обращений по категории
+def get_tickets_by_category(category_key: str):
+    tickets = load_tickets()
+    return [
+        t for t in tickets
+        if t["category"] == category_key
+    ]
