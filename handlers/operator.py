@@ -22,18 +22,17 @@ CATEGORY_MAP = {
     "quality": "Качество сервиса"
 }
 
-# Кнопки управления тикетом
-def ticket_action_buttons(user_id: int, ticket_id: int) -> InlineKeyboardMarkup:
+def operator_actions(ticket_id):
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="Ответить", callback_data=f"reply_{user_id}")],
-        [InlineKeyboardButton(text="Закрыть", callback_data=f"close_{user_id}")],
-        [InlineKeyboardButton(text="Удалить", callback_data=f"delete_{user_id}")]
+        [InlineKeyboardButton(text="Ответить", callback_data=f"reply_{ticket_id}")],
+        [InlineKeyboardButton(text="Закрыть", callback_data=f"close_{ticket_id}")],
+        [InlineKeyboardButton(text="Удалить", callback_data=f"delete_{ticket_id}")]
     ])
 
 @router.callback_query(F.data.startswith("reply_"))
 async def reply_ticket(call: CallbackQuery, state: FSMContext):
-    user_id = int(call.data.split("_")[1])
-    ticket = get_ticket_by_id_by_user_id(user_id)
+    ticket_id = int(call.data.split("_")[1])
+    ticket = get_ticket_by_id(ticket_id)
     if not ticket:
         await call.answer("Тикет не найден.")
         return
@@ -57,16 +56,24 @@ async def send_operator_reply(message: Message, state: FSMContext):
 
 @router.callback_query(F.data.startswith("close_"))
 async def close_ticket(call: CallbackQuery):
-    user_id = int(call.data.split("_")[1])
-    close_ticket_by_user_id(user_id)
-    await call.message.edit_text("🟢 Обращение закрыто.")
+    ticket_id = int(call.data.split("_")[1])
+    ticket = get_ticket_by_id(ticket_id)
+    if not ticket:
+        await call.answer("Тикет не найден.")
+        return
+    close_ticket_by_user_id(ticket["user_id"])
+    await call.message.edit_text("Обращение закрыто.")
     await call.answer("Закрыто.")
 
 @router.callback_query(F.data.startswith("delete_"))
 async def delete_ticket(call: CallbackQuery):
-    user_id = int(call.data.split("_")[1])
-    delete_ticket_by_user_id(user_id)
-    await call.message.edit_text("🗑️ Обращение удалено.")
+    ticket_id = int(call.data.split("_")[1])
+    ticket = get_ticket_by_id(ticket_id)
+    if not ticket:
+        await call.answer("Тикет не найден.")
+        return
+    delete_ticket_by_user_id(ticket["user_id"])
+    await call.message.edit_text("Обращение удалено.")
     await call.answer("Удалено.")
 
 @router.message(F.text.startswith("/view "))
@@ -88,18 +95,18 @@ async def view_ticket(message: Message):
     caption = (
         f"<b>Тикет #{ticket['id']}</b>\n"
         f"Категория: {CATEGORY_MAP.get(ticket['category'], ticket['category'])}\n"
-        f"Пользователь: @{ticket['username'] or 'Без username'}\n"
+        f"Пользователь: @{ticket['username']}\n"
         f"Статус: {ticket['status']}\n"
         f"Создан: {ticket['created_at']}\n\n"
         f"{ticket['text']}"
     )
 
-    markup = ticket_action_buttons(ticket["user_id"], ticket["id"])
+    reply_markup = operator_actions(ticket["id"])
 
     if ticket["photo"]:
-        await message.bot.send_photo(message.chat.id, ticket["photo"], caption=caption, reply_markup=markup)
+        await message.bot.send_photo(message.chat.id, photo=ticket["photo"], caption=caption, reply_markup=reply_markup)
     else:
-        await message.answer(caption, reply_markup=markup)
+        await message.answer(caption, reply_markup=reply_markup)
 
 @router.message(F.text == "/list")
 async def list_tickets(message: Message):
