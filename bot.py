@@ -3,7 +3,7 @@ import asyncio
 from aiogram import Bot, Dispatcher
 from config import TOKEN
 from handlers import user, operator
-from aiogram.client.default import DefaultBotProperties
+from aiogram.client.bot import DefaultBotProperties
 bot = Bot(token=TOKEN, default=DefaultBotProperties(parse_mode="HTML"))
 dp = Dispatcher()
 
